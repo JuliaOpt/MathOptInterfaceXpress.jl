@@ -1,1 +1,1 @@
-# XpressMathOptInterface.jl
+# MathOptInterfaceXpress.jl

@@ -1,4 +1,4 @@
-module XpressMathOptInterface
+module MathOptInterfaceXpress
 
 import Base.show, Base.copy
 

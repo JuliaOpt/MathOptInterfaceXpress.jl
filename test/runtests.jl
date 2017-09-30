@@ -1,4 +1,4 @@
-using Xpress, Base.Test, MathOptInterface, XpressMathOptInterface
+using Xpress, Base.Test, MathOptInterface, MathOptInterfaceXpress
 include(joinpath(Pkg.dir("MathOptInterface"), "test", "contlinear.jl"))
 include(joinpath(Pkg.dir("MathOptInterface"), "test", "intlinear.jl"))
 include(joinpath(Pkg.dir("MathOptInterface"), "test", "contconic.jl"))
