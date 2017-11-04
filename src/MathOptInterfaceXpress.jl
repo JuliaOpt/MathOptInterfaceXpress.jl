@@ -27,7 +27,7 @@ mutable struct XpressSolverInstance <: LQOI.LinQuadSolverInstance
     LQOI.@LinQuadSolverInstanceBase
     
 end
-
+ Xpress.Model(::Void) = Xpress.Model()
 function MOI.SolverInstance(s::XpressSolver)
 
     env = nothing
