@@ -465,6 +465,6 @@ MOI.free!(m::XpressSolverInstance) = XPR.free_model(m.onner)
 Writes the current problem data to the given file.
 Supported file types are solver-dependent.
 """
-MOI.writeproblem(m::XpressSolverInstance, filename::String, flags::String="") = XPR.write_model(m.inner, filename, flags)
+writeproblem(m::XpressSolverInstance, filename::String, flags::String="") = XPR.write_model(m.inner, filename, flags)
 
 end # module
