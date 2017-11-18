@@ -1,40 +1,40 @@
-using Xpress, Base.Test, MathOptInterface, MathOptInterfaceXpress
-include(joinpath(Pkg.dir("MathOptInterface"), "test", "contlinear.jl"))
-include(joinpath(Pkg.dir("MathOptInterface"), "test", "intlinear.jl"))
-include(joinpath(Pkg.dir("MathOptInterface"), "test", "contconic.jl"))
-include(joinpath(Pkg.dir("MathOptInterface"), "test", "contquadratic.jl"))
+using Xpress, Base.Test, MathOptInterface, MathOptInterfaceTests, MathOptInterfaceXpress
 
+const MOIT = MathOptInterfaceTests
+const MOIXPR = MathOptInterfaceXpress
 
-# contlinear
-linear1test(MathOptInterfaceXpress.XpressSolver())
-linear2test(MathOptInterfaceXpress.XpressSolver())
-linear3test(MathOptInterfaceXpress.XpressSolver())
-linear4test(MathOptInterfaceXpress.XpressSolver())
-linear5test(MathOptInterfaceXpress.XpressSolver())
-linear6test(MathOptInterfaceXpress.XpressSolver())
-linear7test(MathOptInterfaceXpress.XpressSolver())
-linear8test(MathOptInterfaceXpress.XpressSolver(PRESOLVE = 0)) # infeasible/unbounded
-linear9test(MathOptInterfaceXpress.XpressSolver())
-linear10test(MathOptInterfaceXpress.XpressSolver())
-linear11test(MathOptInterfaceXpress.XpressSolver())
+@testset "MathOptInterfaceXpress" begin
+    @testset "Linear tests" begin
+        linconfig = MOIT.TestConfig(1e-8,1e-8,true,true,true)
+        solver = MOIXPR.XpressSolver()
+        MOIT.contlineartest(solver , linconfig, ["linear12","linear8a","linear8b","linear8c"])
+        
+        solver_nopresolve = MOIXPR.XpressSolver(PRESOLVE = 0)
+        MOIT.contlineartest(solver_nopresolve , linconfig, ["linear12"])
 
-# intlinear
-knapsacktest(MathOptInterfaceXpress.XpressSolver())
-int1test(MathOptInterfaceXpress.XpressSolver())
-int2test(MathOptInterfaceXpress.XpressSolver()) # SOS
-int3test(MathOptInterfaceXpress.XpressSolver())
+        linconfig_nocertificate = MOIT.TestConfig(1e-8,1e-8,true,true,false)
+        MOIT.linear12test(solver, linconfig_nocertificate)
+    end
 
-# contconic
-lin1tests(MathOptInterfaceXpress.XpressSolver())
-lin2tests(MathOptInterfaceXpress.XpressSolver())
-lin3test(MathOptInterfaceXpress.XpressSolver(PRESOLVE = 0)) # infeasible
-lin4test(MathOptInterfaceXpress.XpressSolver(PRESOLVE = 0)) # infeasible
+    @testset "Quadratic tests" begin
+        quadconfig = MOIT.TestConfig(1e-5,1e-5,false,true,true)
+        solver = MOIXPR.XpressSolver()
+        MOIT.contquadratictest(solver, quadconfig)
+    end
 
-# contquadratic
-qp1test(MathOptInterfaceXpress.XpressSolver(), atol = 1e-5)
-qp2test(MathOptInterfaceXpress.XpressSolver(), atol = 1e-5)
-qp3test(MathOptInterfaceXpress.XpressSolver(), atol = 1e-5)
-qcp1test(MathOptInterfaceXpress.XpressSolver(), atol = 1e-5)
-qcp2test(MathOptInterfaceXpress.XpressSolver(), atol = 1e-5)
-qcp3test(MathOptInterfaceXpress.XpressSolver(), atol = 1e-5)
-socp1test(MathOptInterfaceXpress.XpressSolver(), atol = 1e-5)
+    @testset "Linear Conic tests" begin
+        linconfig = MOIT.TestConfig(1e-8,1e-8,true,true,true)
+        solver = MOIXPR.XpressSolver()
+        MOIT.lintest(solver, linconfig, ["lin3","lin4"])
+
+        solver_nopresolve = MOIXPR.XpressSolver(PRESOLVE = 0)
+        MOIT.lintest(solver_nopresolve, linconfig)
+    end
+
+    @testset "Integer Linear tests" begin
+        intconfig = MOIT.TestConfig(1e-8,1e-8,true,true,true)
+        solver = MOIXPR.XpressSolver()
+        MOIT.intlineartest(solver, intconfig)
+    end
+end
+;
