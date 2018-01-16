@@ -12,29 +12,18 @@ const MOI = MathOptInterface
 using LinQuadOptInterface
 const LQOI = LinQuadOptInterface
 
-
-export XpressSolver
-struct XpressSolver <: LQOI.LinQuadSolver
-    options
-end
-function XpressSolver(;kwargs...)
-    return XpressSolver(kwargs)
-end
-
 import Xpress.Model
+Xpress.Model(::Void) = Xpress.Model()
 mutable struct XpressSolverInstance <: LQOI.LinQuadSolverInstance
-
     LQOI.@LinQuadSolverInstanceBase
-    
 end
- Xpress.Model(::Void) = Xpress.Model()
-function MOI.SolverInstance(s::XpressSolver)
+function XpressSolverInstance(;kwargs...)
 
     env = nothing
     instance = XpressSolverInstance(
         (LQOI.@LinQuadSolverInstanceBaseInit)...,
     )
-    for (name,value) in s.options
+    for (name,value) in kwargs
         XPR.setparam!(instance.inner, XPR.XPRS_CONTROLS_DICT[name], value)
     end
     # csi.inner.mipstart_effort = s.mipstart_effortlevel
@@ -73,9 +62,7 @@ const SUPPORTED_OBJECTIVES = [
     LQOI.Quad
 ]
 
-LQOI.lqs_supported_constraints(s::XpressSolver) = SUPPORTED_CONSTRAINTS
 LQOI.lqs_supported_constraints(s::XpressSolverInstance) = SUPPORTED_CONSTRAINTS
-LQOI.lqs_supported_objectives(s::XpressSolver) = SUPPORTED_OBJECTIVES
 LQOI.lqs_supported_objectives(s::XpressSolverInstance) = SUPPORTED_OBJECTIVES
 
 #=
