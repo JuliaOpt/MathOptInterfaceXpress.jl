@@ -17,7 +17,7 @@ const MOIXPR = MathOptInterfaceXpress
     end
 
     @testset "Quadratic tests" begin
-        quadconfig = MOIT.TestConfig(atol = 1e-5, rtol = 1e-5, duals = false)
+        quadconfig = MOIT.TestConfig(atol = 1e-5, rtol = 1e-5, duals = false, query = false)
         solverf() = MOIXPR.XpressSolverInstance()
         MOIT.contquadratictest(solverf, quadconfig)
     end
