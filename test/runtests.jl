@@ -12,12 +12,12 @@ const MOIXPR = MathOptInterfaceXpress
         solverf_nopresolve() = MOIXPR.XpressSolverInstance(PRESOLVE = 0)
         MOIT.contlineartest(solverf_nopresolve , linconfig, ["linear12"])
 
-        linconfig_nocertificate = MOIT.TestConfig(infeas_certificates = false)
+        linconfig_nocertificate = MOIT.TestConfig(infeas_certificates=false)
         MOIT.linear12test(solverf, linconfig_nocertificate)
     end
 
     @testset "Quadratic tests" begin
-        quadconfig = MOIT.TestConfig(atol = 1e-5, rtol = 1e-5, duals = false, query = false)
+        quadconfig = MOIT.TestConfig(atol=1e-5, rtol=1e-5, duals=false, query=false)
         solverf() = MOIXPR.XpressSolverInstance()
         MOIT.contquadratictest(solverf, quadconfig)
     end
@@ -27,7 +27,7 @@ const MOIXPR = MathOptInterfaceXpress
         solverf() = MOIXPR.XpressSolverInstance()
         MOIT.lintest(solverf, linconfig, ["lin3","lin4"])
 
-        solverf_nopresolve() = MOIXPR.XpressSolverInstance(PRESOLVE = 0)
+        solverf_nopresolve() = MOIXPR.XpressSolverInstance(PRESOLVE=0)
         MOIT.lintest(solverf_nopresolve, linconfig)
     end
 
