@@ -36,5 +36,14 @@ const MOIXPR = MathOptInterfaceXpress
         solver = XpressOptimizer()
         MOIT.intlineartest(solver, intconfig)
     end
+
+    @testset "ModelLike tests" begin
+        intconfig = MOIT.TestConfig()
+        solver = XpressOptimizer()
+        MOIT.validtest(solver)
+        MOIT.emptytest(solver)
+        solver2 = XpressOptimizer()
+        #MOIT.copytest(solver,solver2)
+    end
 end
 ;
