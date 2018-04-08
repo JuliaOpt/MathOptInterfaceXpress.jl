@@ -7,13 +7,17 @@ const MOIXPR = MathOptInterfaceXpress
     @testset "Linear tests" begin
         linconfig = MOIT.TestConfig()
         solver = XpressOptimizer()
-        MOIT.contlineartest(solver , linconfig, ["linear12","linear8a","linear8b","linear8c"])
+        MOIT.contlineartest(solver , linconfig, ["linear10","linear12","linear8a","linear8b","linear8c"])
         
         solver_nopresolve = XpressOptimizer(PRESOLVE = 0)
-        MOIT.contlineartest(solver_nopresolve , linconfig, ["linear12"])
+        MOIT.contlineartest(solver_nopresolve , linconfig, ["linear10","linear12"])
 
         linconfig_nocertificate = MOIT.TestConfig(infeas_certificates=false)
         MOIT.linear12test(solver, linconfig_nocertificate)
+
+        # Intervals
+        linconfig_noquery = MOIT.TestConfig(query=false)
+        MOIT.linear10test(solver, linconfig_noquery)
     end
 
     @testset "Quadratic tests" begin
@@ -43,7 +47,7 @@ const MOIXPR = MathOptInterfaceXpress
         MOIT.validtest(solver)
         MOIT.emptytest(solver)
         solver2 = XpressOptimizer()
-        #MOIT.copytest(solver,solver2)
+        MOIT.copytest(solver,solver2)
     end
 end
 ;
