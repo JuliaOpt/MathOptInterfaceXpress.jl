@@ -1,9 +1,25 @@
+#push!(Base.LOAD_PATH,joinpath(dirname(@__FILE__),"..",".."))
+
 using Xpress, Base.Test, MathOptInterface, MathOptInterface.Test, MathOptInterfaceXpress
 
+const MOI = MathOptInterface
 const MOIT = MathOptInterface.Test
 const MOIXPR = MathOptInterfaceXpress
 
 @testset "MathOptInterfaceXpress" begin
+    @testset "Unit Tests" begin
+        config = MOIT.TestConfig()
+        solver = XpressOptimizer()
+
+        MOIT.basic_constraint_tests(solver, config;
+            exclude = [
+            ]
+        )
+
+        MOIT.unittest(solver, config, [
+            "solve_affine_interval"
+        ])
+    end
     @testset "Linear tests" begin
         linconfig = MOIT.TestConfig()
         solver = XpressOptimizer()
@@ -44,10 +60,23 @@ const MOIXPR = MathOptInterfaceXpress
     @testset "ModelLike tests" begin
         intconfig = MOIT.TestConfig()
         solver = XpressOptimizer()
-        MOIT.validtest(solver)
-        MOIT.emptytest(solver)
-        solver2 = XpressOptimizer()
-        MOIT.copytest(solver,solver2)
+        MOIT.nametest(solver)
+        @testset "validtest" begin
+            MOIT.validtest(solver)
+        end
+        @testset "emptytest" begin
+            MOIT.emptytest(solver)
+        end
+        @testset "orderedindicestest" begin
+            MOIT.orderedindicestest(solver)
+        end
+        @testset "canaddconstrainttest" begin
+            MOIT.canaddconstrainttest(solver, Float64, Complex{Float64})
+        end
+        @testset "copytest" begin
+            solver2 = XpressOptimizer()
+            MOIT.copytest(solver,solver2)
+        end
     end
 end
 ;
