@@ -62,6 +62,8 @@ end
 
 function MOI.empty!(m::XpressOptimizer) 
     MOI.empty!(m,nothing)
+    m.constraint_primal_solution = m.qconstraint_primal_solution
+    m.constraint_dual_solution = m.qconstraint_dual_solution
     for (name,value) in m.params
         XPR.setparam!(m.inner, XPR.XPRS_CONTROLS_DICT[name], value)
     end
@@ -111,6 +113,18 @@ LQOI.get_variable_upperbound(instance::XpressOptimizer, col) = XPR.get_ub(instan
 
 LQOI.get_number_linear_constraints(instance::XpressOptimizer) = XPR.num_linconstrs(instance.inner)
 
+LQOI.get_last_linear_constraint_index(instance::XpressOptimizer) = num_constrs(instance.inner)
+LQOI.get_last_quadratic_constraint_index(instance::XpressOptimizer) = num_constrs(instance.inner)
+
+function LQOI.shift_references_after_delete_quadratic!(instance::XpressOptimizer, row)
+    LQOI.shift_references_after_delete_quadratic_base!(instance, row)
+    LQOI.shift_references_after_delete_affine_base!(instance, row)
+end
+function LQOI.shift_references_after_delete_affine!(instance::XpressOptimizer, row)
+    LQOI.shift_references_after_delete_quadratic_base!(instance, row)
+    LQOI.shift_references_after_delete_affine_base!(instance, row)
+end
+
 LQOI.add_linear_constraints!(instance::XpressOptimizer, A::LQOI.CSRMatrix{Float64}, sensevec, rhsvec) = XPR.add_constrs!(instance.inner, A.row_pointers, A.columns, A.coefficients, sensevec, rhsvec)
 
 function LQOI.add_ranged_constraints!(instance::XpressOptimizer, A::LQOI.CSRMatrix{Float64}, lowerbound, upperbound)
@@ -130,6 +144,7 @@ function LQOI.modify_ranged_constraints!(instance::XpressOptimizer, rows::Vector
 end
 
 LQOI.get_rhs(instance::XpressOptimizer, row) = XPR.get_rhs(instance.inner, row, row)[1]
+LQOI.get_quadratic_rhs(instance::XpressOptimizer, row) = XPR.get_rhs(instance.inner, row, row)[1]
 
 function LQOI.get_range(instance::XpressOptimizer, row)
     ub = XPR.get_rhs(instance.inner, row, row)[1]
@@ -146,9 +161,9 @@ end
 function LQOI.get_quadratic_constraint(instance::XpressOptimizer, idx)
     A = XPR.get_rows(instance.inner, idx, idx)'
 
-    Q = XPR.get_qrowmatrix_triplets(instance.inner, idx)
+    Q = XPR.get_qrowmatrix(instance.inner, idx)
 
-    return A.rowval-1, A.nzval, Q
+    return A.rowval, A.nzval, Q
 end
 
 # notin LQOI
@@ -260,8 +275,8 @@ function LQOI.get_linear_objective!(instance::XpressOptimizer, x::Vector{Float64
 end
 
 function LQOI.get_quadratic_terms_objective(instance::XpressOptimizer)
-    I, J, V = XPR.getq(instance.inner)
-    return I, J, V
+    Q = XPR.getq(instance.inner)
+    return Q
 end
 
 function LQOI.get_objectivesense(instance::XpressOptimizer)
@@ -449,12 +464,13 @@ end
 LQOI.get_variable_primal_solution!(instance::XpressOptimizer, place) = XPR.get_solution!(instance.inner, place)
 
 function LQOI.get_linear_primal_solution!(instance::XpressOptimizer, place)
+    XPR.get_slack!(instance.inner, place)
+    rhs = XPR.get_rhs(instance.inner)
+    for i in eachindex(place)
+        place[i] = -place[i]+rhs[i]
+    end
+    return nothing
     if num_qconstrs(instance.inner) == 0
-        XPR.get_slack_lin!(instance.inner, place)
-        rhs = XPR.get_rhs(instance.inner)
-        for i in eachindex(place)
-            place[i] = -place[i]+rhs[i]
-        end
     else
         XPR.get_slack_lin!(instance.inner, place)
         rhs = XPR.get_rhs(instance.inner)
@@ -476,6 +492,7 @@ function moi_lrows(m::Xpress.Model)
 end
 
 function LQOI.get_quadratic_primal_solution!(instance::XpressOptimizer, place)
+    return nothing
     if num_qconstrs(instance.inner) == 0
         return nothing
     else
@@ -492,9 +509,10 @@ end
 
 LQOI.get_variable_dual_solution!(instance::XpressOptimizer, place) = XPR.get_reducedcost!(instance.inner, place)
 
-LQOI.get_linear_dual_solution!(instance::XpressOptimizer, place) = XPR.get_dual_lin!(instance.inner, place)
+LQOI.get_linear_dual_solution!(instance::XpressOptimizer, place) = XPR.get_dual!(instance.inner, place)
 
 function LQOI.get_quadratic_dual_solution!(instance::XpressOptimizer, place)
+    return nothing
     if num_qconstrs(instance.inner) == 0
         return nothing
     else
