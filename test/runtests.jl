@@ -1,5 +1,3 @@
-#push!(Base.LOAD_PATH,joinpath(dirname(@__FILE__),"..",".."))
-
 using Xpress, Base.Test, MathOptInterface, MathOptInterface.Test, MathOptInterfaceXpress
 
 const MOI = MathOptInterface
@@ -10,12 +8,10 @@ const MOIXPR = MathOptInterfaceXpress
     @testset "Unit Tests" begin
         config = MOIT.TestConfig()
         solver = XpressOptimizer()
-
         MOIT.basic_constraint_tests(solver, config;
             exclude = [
             ]
         )
-
         MOIT.unittest(solver, config, [
             "solve_affine_interval"
         ])
@@ -37,7 +33,7 @@ const MOIXPR = MathOptInterfaceXpress
     end
 
     @testset "Quadratic tests" begin
-        quadconfig = MOIT.TestConfig(atol=1e-5, rtol=1e-5, duals=false, query=false)
+        quadconfig = MOIT.TestConfig(atol=1e-5, rtol=1e-5, duals=false)
         solver = XpressOptimizer()
         MOIT.contquadratictest(solver, quadconfig)
     end
