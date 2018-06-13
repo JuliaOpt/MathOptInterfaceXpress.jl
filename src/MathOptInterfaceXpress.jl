@@ -173,7 +173,7 @@ function LQOI.get_linear_constraint(instance::XpressOptimizer, row)
     # quadind
     _row = instance.l_rows[row]
     A = XPR.get_rows(instance.inner, _row, _row)'
-    return A.rowval-1, A.nzval
+    return A.rowval, A.nzval
 end
 
 function LQOI.get_quadratic_constraint(instance::XpressOptimizer, row)
