@@ -1,3 +1,5 @@
+#push!(Base.LOAD_PATH,joinpath(dirname(@__FILE__),"..",".."))
+
 using Xpress, Base.Test, MathOptInterface, MathOptInterface.Test, MathOptInterfaceXpress
 
 const MOI = MathOptInterface
