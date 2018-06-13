@@ -42,6 +42,8 @@ const SUPPORTED_CONSTRAINTS = [
 mutable struct XpressOptimizer <: LQOI.LinQuadOptimizer
     LQOI.@LinQuadOptimizerBase
     params::Dict{Any,Any}
+    l_rows::Vector{Int}
+    q_rows::Vector{Int}
     XpressOptimizer(::Void) = new()
 end
 
@@ -62,8 +64,10 @@ end
 
 function MOI.empty!(m::XpressOptimizer) 
     MOI.empty!(m,nothing)
-    m.constraint_primal_solution = m.qconstraint_primal_solution
-    m.constraint_dual_solution = m.qconstraint_dual_solution
+    # m.constraint_primal_solution = m.qconstraint_primal_solution
+    # m.constraint_dual_solution = m.qconstraint_dual_solution
+    m.l_rows = Int[]
+    m.q_rows = Int[]
     for (name,value) in m.params
         XPR.setparam!(m.inner, XPR.XPRS_CONTROLS_DICT[name], value)
     end
@@ -82,10 +86,8 @@ backend_type(m::XpressOptimizer, ::MOI.Zeros)        = Cchar('E')
 backend_type(m::XpressOptimizer, ::MOI.Nonpositives) = Cchar('L')
 backend_type(m::XpressOptimizer, ::MOI.Nonnegatives) = Cchar('G')
 
-
-
 #=
-not in LinQuad
+    not in LinQuad
 =#
 
 setparam!(instance::XpressOptimizer, name, val) = XPR.setparam!(instance.inner, XPR.XPRS_CONTROLS_DICT[name], val)
@@ -95,11 +97,7 @@ setlogfile!(instance::XpressOptimizer, path) = XPR.setlogfile(instance.inner, pa
 cintvec(v::Vector) = convert(Vector{Int32}, v)
 
 #=
-    inner wrapper
-=#
-
-#=
-Constraints
+    Constraints
 =#
 
 MOI.canset(::XpressOptimizer, ::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}) = true
@@ -113,63 +111,85 @@ LQOI.get_variable_upperbound(instance::XpressOptimizer, col) = XPR.get_ub(instan
 
 LQOI.get_number_linear_constraints(instance::XpressOptimizer) = XPR.num_linconstrs(instance.inner)
 
-LQOI.get_last_linear_constraint_index(instance::XpressOptimizer) = num_constrs(instance.inner)
-LQOI.get_last_quadratic_constraint_index(instance::XpressOptimizer) = num_constrs(instance.inner)
+LQOI.get_number_quadratic_constraints(instance::XpressOptimizer) = XPR.num_qconstrs(instance.inner)
 
-function LQOI.shift_references_after_delete_quadratic!(instance::XpressOptimizer, row)
-    LQOI.shift_references_after_delete_quadratic_base!(instance, row)
-    LQOI.shift_references_after_delete_affine_base!(instance, row)
-end
-function LQOI.shift_references_after_delete_affine!(instance::XpressOptimizer, row)
-    LQOI.shift_references_after_delete_quadratic_base!(instance, row)
-    LQOI.shift_references_after_delete_affine_base!(instance, row)
-end
+# function LQOI.shift_references_after_delete_quadratic!(instance::XpressOptimizer, row)
+#     LQOI.shift_references_after_delete_quadratic_base!(instance, row)
+#     LQOI.shift_references_after_delete_affine_base!(instance, row)
+# end
+# function LQOI.shift_references_after_delete_affine!(instance::XpressOptimizer, row)
+#     LQOI.shift_references_after_delete_quadratic_base!(instance, row)
+#     LQOI.shift_references_after_delete_affine_base!(instance, row)
+# end
 
-LQOI.add_linear_constraints!(instance::XpressOptimizer, A::LQOI.CSRMatrix{Float64}, sensevec, rhsvec) = XPR.add_constrs!(instance.inner, A.row_pointers, A.columns, A.coefficients, sensevec, rhsvec)
+function LQOI.add_linear_constraints!(instance::XpressOptimizer, A::LQOI.CSRMatrix{Float64}, sensevec, rhsvec)
+    newrows = length(rhsvec)
+    rows = XPR.num_constrs(instance.inner)
+    addedrows = collect((rows+1):(rows+newrows))
+    # quadind
+    append!(instance.l_rows,addedrows)
+    XPR.add_constrs!(instance.inner, A.row_pointers, A.columns, A.coefficients, sensevec, rhsvec)
+end
 
 function LQOI.add_ranged_constraints!(instance::XpressOptimizer, A::LQOI.CSRMatrix{Float64}, lowerbound, upperbound)
     newrows = length(lowerbound)
-    rows = XPR.num_linconstrs(instance.inner)
+    rows = XPR.num_constrs(instance.inner)
     addedrows = collect((rows+1):(rows+newrows))
-
+    # quadind
+    append!(instance.l_rows,addedrows)
     sensevec = fill(Cchar('E'),newrows)
     XPR.add_constrs!(instance.inner, A.row_pointers, A.columns, A.coefficients, sensevec, upperbound)
-
     XPR.chg_rhsrange!(instance.inner, cintvec(addedrows), +upperbound-lowerbound)
 end
 
 function LQOI.modify_ranged_constraints!(instance::XpressOptimizer, rows::Vector{Int}, lowerbound::Vector{Float64}, upperbound::Vector{Float64})
-    XPR.set_rhs!(instance.inner, rows, upperbound)
-    XPR.chg_rhsrange!(instance.inner, cintvec(rows), +upperbound-lowerbound)
+    # quadind
+    _rows = instance.l_rows[rows]
+    XPR.set_rhs!(instance.inner, _rows, upperbound)
+    XPR.chg_rhsrange!(instance.inner, cintvec(_rows), +upperbound-lowerbound)
 end
 
-LQOI.get_rhs(instance::XpressOptimizer, row) = XPR.get_rhs(instance.inner, row, row)[1]
-LQOI.get_quadratic_rhs(instance::XpressOptimizer, row) = XPR.get_rhs(instance.inner, row, row)[1]
+function LQOI.get_rhs(instance::XpressOptimizer, row)
+    # quadind
+    _row = instance.l_rows[row]
+    return XPR.get_rhs(instance.inner, _row, _row)[1]
+end
+function LQOI.get_quadratic_rhs(instance::XpressOptimizer, row)
+    # quadind
+    _row = instance.q_rows[row]
+    return XPR.get_rhs(instance.inner, _row, _row)[1]
+end
 
 function LQOI.get_range(instance::XpressOptimizer, row)
-    ub = XPR.get_rhs(instance.inner, row, row)[1]
-    r = XPR.get_rhsrange(instance.inner, row, row)[1]
+    # quadind
+    _row = instance.l_rows[row]
+    ub = XPR.get_rhs(instance.inner, _row, _row)[1]
+    r = XPR.get_rhsrange(instance.inner, _row, _row)[1]
     return ub-r, ub
 end
 
 # TODO improve
-function LQOI.get_linear_constraint(instance::XpressOptimizer, idx)
-    A = XPR.get_rows(instance.inner, idx, idx)'
+function LQOI.get_linear_constraint(instance::XpressOptimizer, row)
+    # quadind
+    _row = instance.l_rows[row]
+    A = XPR.get_rows(instance.inner, _row, _row)'
     return A.rowval-1, A.nzval
 end
 
-function LQOI.get_quadratic_constraint(instance::XpressOptimizer, idx)
-    A = XPR.get_rows(instance.inner, idx, idx)'
-
-    Q = XPR.get_qrowmatrix(instance.inner, idx)
-
+function LQOI.get_quadratic_constraint(instance::XpressOptimizer, row)
+    # quadind
+    _row = instance.q_rows[row]
+    A = XPR.get_rows(instance.inner, _row, _row)'
+    Q = XPR.get_qrowmatrix(instance.inner, _row)
     return A.rowval, A.nzval, Q
 end
 
 # notin LQOI
 # TODO improve
 function getcoef(instance::XpressOptimizer, row, col)
-    A = XPR.get_rows(instance.inner, row, row)'
+    # quadind
+    _row = instance.l_rows[row]
+    A = XPR.get_rows(instance.inner, _row, _row)'
     cols = A.rowval
     vals = A.nzval
 
@@ -181,20 +201,40 @@ function getcoef(instance::XpressOptimizer, row, col)
     end
 end
 
-LQOI.change_matrix_coefficient!(instance::XpressOptimizer, row, col, coef) = XPR.chg_coeffs!(instance.inner, row, col, coef)
+function LQOI.change_matrix_coefficient!(instance::XpressOptimizer, row, col, coef)
+    # quadind
+    _row = instance.l_rows[row]
+    XPR.chg_coeffs!(instance.inner, _row, col, coef)
+end
 
-LQOI.change_objective_coefficient!(instance::XpressOptimizer, col, coef) = XPR.set_objcoeffs!(instance.inner, Int32[col], Float64[coef])
-
-LQOI.change_rhs_coefficient!(instance::XpressOptimizer, row, coef) = XPR.set_rhs!(instance.inner, Int32[row], Float64[coef])
-
-LQOI.delete_linear_constraints!(instance::XpressOptimizer, rowbeg, rowend) = XPR.del_constrs!(instance.inner, cintvec(collect(rowbeg:rowend)))
-
-LQOI.delete_quadratic_constraints!(instance::XpressOptimizer, rowbeg, rowend) = XPR.del_constrs!(instance.inner, cintvec(collect(rowbeg:rowend)))
-
+function LQOI.change_objective_coefficient!(instance::XpressOptimizer, col, coef)
+    XPR.set_objcoeffs!(instance.inner, Int32[col], Float64[coef])
+end
+function LQOI.change_rhs_coefficient!(instance::XpressOptimizer, row, coef)
+    # quadind
+    _row = instance.l_rows[row]
+    XPR.set_rhs!(instance.inner, Int32[_row], Float64[coef])
+end
+function LQOI.delete_linear_constraints!(instance::XpressOptimizer, rowbeg, rowend)
+    _rows = instance.l_rows[collect(rowbeg:rowend)]
+    XPR.del_constrs!(instance.inner, cintvec(_rows))
+    for i in rowend:-1:rowbeg
+        deleteat!(instance.l_rows,i)
+    end
+end
+function LQOI.delete_quadratic_constraints!(instance::XpressOptimizer, rowbeg, rowend)
+    _rows = instance.q_rows[collect(rowbeg:rowend)]
+    XPR.del_constrs!(instance.inner, cintvec(_rows))
+    for i in rowend:-1:rowbeg
+        deleteat!(instance.q_rows,i)
+    end
+end
 LQOI.change_variable_types!(instance::XpressOptimizer, colvec, typevec) = XPR.chgcoltypes!(instance.inner, colvec, typevec)
 
-LQOI.change_linear_constraint_sense!(instance::XpressOptimizer, rowvec, sensevec) = XPR.set_rowtype!(instance.inner, rowvec, sensevec)
-
+function LQOI.change_linear_constraint_sense!(instance::XpressOptimizer, rowvec, sensevec)
+    _rows = instance.l_rows[rowvec]
+    XPR.set_rowtype!(instance.inner, _rows, sensevec)
+end
 LQOI.add_sos_constraint!(instance::XpressOptimizer, colvec, valvec, typ) = XPR.add_sos!(instance.inner, typ, colvec, valvec)
 
 LQOI.delete_sos!(instance::XpressOptimizer, idx1, idx2) = XPR.del_sos!(instance.inner, cintvec(collect(idx1:idx2)))
@@ -208,9 +248,6 @@ function LQOI.get_sos_constraint(instance::XpressOptimizer, idx)
     typ = types[idx] == Cchar('1') ? :SOS1 : :SOS2
     return cols, vals, typ
 end
-
-LQOI.get_number_quadratic_constraints(instance::XpressOptimizer) = XPR.num_qconstrs(instance.inner)
-
 
 function scalediagonal!(V, I, J, scale)
     #  LQOI assumes 0.5 x' Q x, but Gurobi requires the list of terms, e.g.,
@@ -232,7 +269,9 @@ function LQOI.add_quadratic_constraint!(instance::XpressOptimizer, cols, coefs, 
     scalediagonal!(V, I, J, 0.5)
     XPR.add_qconstr!(instance.inner, cols, coefs, I, J, V, sense, rhs)
     scalediagonal!(V, I, J, 2.0)
+    push!(instance.q_rows, num_constrs(instance.inner))
 end
+
 #=
     Objective
 =#
@@ -464,13 +503,13 @@ end
 LQOI.get_variable_primal_solution!(instance::XpressOptimizer, place) = XPR.get_solution!(instance.inner, place)
 
 function LQOI.get_linear_primal_solution!(instance::XpressOptimizer, place)
-    XPR.get_slack!(instance.inner, place)
-    rhs = XPR.get_rhs(instance.inner)
-    for i in eachindex(place)
-        place[i] = -place[i]+rhs[i]
-    end
-    return nothing
     if num_qconstrs(instance.inner) == 0
+        XPR.get_slack_lin!(instance.inner, place)
+        rhs = XPR.get_rhs(instance.inner)
+        for i in eachindex(place)
+            place[i] = -place[i]+rhs[i]
+        end
+        return nothing
     else
         XPR.get_slack_lin!(instance.inner, place)
         rhs = XPR.get_rhs(instance.inner)
@@ -482,17 +521,7 @@ function LQOI.get_linear_primal_solution!(instance::XpressOptimizer, place)
     nothing
 end
 
-function moi_lrows(m::Xpress.Model)
-    tt_rows = collect(1:num_constrs(m))
-    if num_qconstrs(m) == 0
-        return tt_rows
-    else
-        return setdiff(tt_rows, XPR.get_qrows(m))
-    end
-end
-
 function LQOI.get_quadratic_primal_solution!(instance::XpressOptimizer, place)
-    return nothing
     if num_qconstrs(instance.inner) == 0
         return nothing
     else
@@ -509,10 +538,9 @@ end
 
 LQOI.get_variable_dual_solution!(instance::XpressOptimizer, place) = XPR.get_reducedcost!(instance.inner, place)
 
-LQOI.get_linear_dual_solution!(instance::XpressOptimizer, place) = XPR.get_dual!(instance.inner, place)
+LQOI.get_linear_dual_solution!(instance::XpressOptimizer, place) = XPR.get_dual_lin!(instance.inner, place)
 
 function LQOI.get_quadratic_dual_solution!(instance::XpressOptimizer, place)
-    return nothing
     if num_qconstrs(instance.inner) == 0
         return nothing
     else
@@ -546,7 +574,7 @@ LQOI.get_farkas_dual!(instance::XpressOptimizer, place) = XPR.getdualray!(instan
 LQOI.get_unbounded_ray!(instance::XpressOptimizer, place) = XPR.getprimalray!(instance.inner, place)
 
 
-MOI.free!(m::XpressOptimizer) = XPR.free_model(m.onner)
+MOI.free!(m::XpressOptimizer) = XPR.free_model(m.inner)
 
 """
     writeproblem(m: :MOI.AbstractOptimizer, filename::String)
