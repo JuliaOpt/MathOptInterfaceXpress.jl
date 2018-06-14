@@ -509,12 +509,12 @@ end
 
 LQOI.get_objective_value(instance::XpressOptimizer) = XPR.get_objval(instance.inner)
 
-LQOI.get_objective_bound(instance::XpressOptimizer) = XPR.get_mip_objval(instance.inner)
+LQOI.get_objective_bound(instance::XpressOptimizer) = XPR.get_bestbound(instance.inner)
 
 function LQOI.get_relative_mip_gap(instance::XpressOptimizer)
-    L = XPR.get_mip_objval(instance.inner)
-    U = XPR.get_bestbound(instance.inner)
-    return abs(U-L)/U
+    best_feasible_solution = XPR.get_mip_objval(instance.inner)
+    best_possible_solution = XPR.get_bestbound(instance.inner)
+    return abs((best_possible_solution-best_feasible_solution)/best_possible_solution)
 end
 
 LQOI.get_iteration_count(instance::XpressOptimizer)  = XPR.get_simplex_iter_count(instance.inner)
